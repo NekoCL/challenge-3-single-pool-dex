@@ -92,32 +92,29 @@ contract DEX {
      * @notice sends Ether to DEX in exchange for $BAL
      */
     function ethToToken() public payable returns (uint256 tokenOutput) {
-        //  require(msg.value > 0, "ethToToken: can't trade 0");
+        require(msg.value > 0, "ethToToken: can't trade 0");
         uint256 ethReserve = address(this).balance.sub(msg.value);
         uint256 token_reserve = token.balanceOf(address(this));
         uint256 tokenOutput = price(msg.value, ethReserve, token_reserve);
 
-        //  totalLiquidity = totalLiquidity.sub(tokenOutput); //update totalLiquidity? I guess you don't because even though liquidity is changing... it isn't in a macro-scale? We still have the same amount of liquidity in "total" but just different asset ratios.
         require(token.transfer(msg.sender, tokenOutput), "ethToToken(): reverted swap.");
-        return tokenOutput;
         emit EthToTokenSwap(msg.sender, tokenOutput, msg.value);
+        return tokenOutput;
     }
 
     /**
      * @notice sends $BAL tokens to DEX in exchange for Ether
      */
     function tokenToEth(uint256 tokenInput) public returns (uint256 ethOutput) {
-        //  require(tokenInput > 0, "tokenToEth: can't trade 0");
+        require(tokenInput > 0, "tokenToEth: can't trade 0");
         uint256 token_reserve = token.balanceOf(address(this));
-
         uint256 ethOutput = price(tokenInput, token_reserve, address(this).balance);
 
-        //  totalLiquidity = totalLiquidity.add(tokenInput); //update totalLiquidity
         require(token.transferFrom(msg.sender, address(this), tokenInput), "tokenToEth(): reverted swap.");
         (bool sent, ) = msg.sender.call{ value: ethOutput }("");
         require(sent, "tokenToEth: revert in transferring eth to you!");
-        return ethOutput;
         emit TokenToEthSwap(msg.sender, ethOutput, tokenInput);
+        return ethOutput;
     }
 
     /**
@@ -125,6 +122,7 @@ contract DEX {
      * NOTE: Ratio needs to be maintained.
      */
     function deposit() public payable returns (uint256 tokensDeposited) {
+        require(msg.value > 0, "deposit: must deposit more than 0");
         uint256 ethReserve = address(this).balance.sub(msg.value);
         uint256 tokenReserve = token.balanceOf(address(this));
         uint256 tokenDeposit;
@@ -135,7 +133,6 @@ contract DEX {
         totalLiquidity = totalLiquidity.add(liquidityMinted);
 
         require(token.transferFrom(msg.sender, address(this), tokenDeposit));
-        return tokenDeposit;
         emit LiquidityProvided(
             msg.sender,
             msg.value,
@@ -144,12 +141,14 @@ contract DEX {
             liquidityMinted,
             totalLiquidity
         );
+        return tokenDeposit;
     }
 
     /**
      * @notice allows withdrawal of $BAL and $ETH from liquidity pool
      */
     function withdraw(uint256 amount) public returns (uint256 eth_amount, uint256 token_amount) {
+        require(liquidity[msg.sender] >= amount, "withdraw: sender does not have enough liquidity to withdraw");
         uint256 ethReserve = address(this).balance;
         uint256 tokenReserve = token.balanceOf(address(this));
         uint256 ethWithdrawn;
@@ -163,7 +162,6 @@ contract DEX {
         require(sent, "withdraw(): revert in transferring eth to you!");
         require(token.transfer(msg.sender, tokenAmount));
 
-        return (ethWithdrawn, tokenAmount);
         emit LiquidityRemoved(
             msg.sender,
             ethWithdrawn,
@@ -172,5 +170,6 @@ contract DEX {
             ethWithdrawn,
             totalLiquidity
         );
+        return (ethWithdrawn, tokenAmount);
     }
 }
